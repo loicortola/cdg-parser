@@ -1,0 +1,4 @@
+{
+  "pattern": "[0-9a-zA-Z]+ - (.*) - (.*)$",
+  "mapping": ["title", "artist"]
+}

@@ -11,14 +11,13 @@ const stringUtils = require('./string-utils');
  * @param name
  * @param callback
  */
-const processSong = (config, root, collection, name, callback) => {
-  console.log('Will process song ' + name + ' in ' + root);
+const processZip = (config, root, collection, name, callback) => {
+  console.log('Will process zip ' + name + ' in ' + root);
   // Retrieve files and check that they exist
-  const cdgFile = ioUtils.getFileSync(root, name, '.cdg');
-  const mp3File = ioUtils.getFileSync(root, name, '.mp3');
+  const zipFile = ioUtils.getFileSync(root, name, '.zip');
 
-  if (!cdgFile || !mp3File) {
-    callback('Cannot find either CDG or MP3 file for ' + root + '/' + name);
+  if (!zipFile) {
+    callback('Cannot find either ZIP file for ' + root + '/' + name);
     return;
   }
 
@@ -26,9 +25,8 @@ const processSong = (config, root, collection, name, callback) => {
 
   // Ensure we have artist and title
   if (!song.artist || !song.title) {
-    ioUtils.copyToError(cdgFile, name + '.cdg');
-    ioUtils.copyToError(mp3File, name + '.mp3');
-    callback('Error parsing song. Should not happen.\n');
+    ioUtils.copyToError(zipFile, name + '.zip');
+    callback('Error parsing zip. Should not happen.\n');
     return;
   }
 
@@ -37,10 +35,9 @@ const processSong = (config, root, collection, name, callback) => {
 
   // We will create a lock to tell we are going to write this song (avoids duplicates)
   const lockFile = path.join('output', newName + '.lock');
-  const zippedData = ioUtils.compressSongData(cdgFile, mp3File, newName);
 
   // Generate processing function
-  const processor = getProcessor(song, newName, lockFile, zippedData, callback);
+  const processor = getProcessor(song, newName, lockFile, zipFile, callback);
   // Lock or wait for lock to be freed
   ioUtils.lockOrWaitThenProcess(lockFile, processor, 5);
 };
@@ -50,11 +47,11 @@ const processSong = (config, root, collection, name, callback) => {
  * @param song
  * @param newName
  * @param lockFile
- * @param zippedData
+ * @param zipFile
  * @param callback(err, song)
  * @returns {function()}
  */
-const getProcessor = (song, newName, lockFile, zippedData, callback) => {
+const getProcessor = (song, newName, lockFile, zipFile, callback) => {
   // Compute folder hierarchy
   const firstFolder = song.artist.replace(/[-_'\\s]/, '').substr(0, 1).toUpperCase();
   const secondFolder = song.artist.replace(/[-_'\\s]/, '').substr(0, 2).toUpperCase();
@@ -74,12 +71,12 @@ const getProcessor = (song, newName, lockFile, zippedData, callback) => {
           return {directory: path.join('output', 'processed', firstFolder, secondFolder), file: newName + '.zip'};
         })
         .then((dest) => {
-          ioUtils.storeZip(song, lockFile, dest, zippedData, callback);
+          ioUtils.storeExistingZip(song, lockFile, dest, zipFile, callback);
         });
   };
 };
 
 // create a worker and register public functions
 module.exports = (config, root, collection, name, callback) => {
-  processSong(config, root, collection, name, callback);
+  processZip(config, root, collection, name, callback);
 };

@@ -29,7 +29,7 @@ const readInputs = () => {
             readFile(parserFile, {encoding: 'utf8'})
               .then((data) => {
                 folderCount++;
-                processFolder(karaokeRoot, JSON.parse(data), (songs) => {
+                processFolder(karaokeRoot, f, JSON.parse(data), (songs) => {
                   console.log('Finished processing folder');
                   allSongs = allSongs.concat(songs);
                   --folderCount;
@@ -60,28 +60,42 @@ const readInputs = () => {
 /**
  * Process a karaoke folder
  * @param root the root folder containing the first level of songs
+ * @param collection the name of the collection
  * @param config the parser configuration for this folder (pattern, etc...)
  * @param callback when done
  */
-const processFolder = (root, config, callback) => {
+const processFolder = (root, collection, config, callback) => {
   console.log('Will process folder ' + root);
   let fileCount = 0;
+  let children = 0;
   let songs = [];
   readdir(root)
       .then((files) => {
         files.forEach((f) => {
           stat(root + '/' + f)
               .then((stats) => {
-                if (stats.isFile() && f.endsWith('.cdg')) {
+                if (stats.isFile() && f.toLowerCase().endsWith('.cdg')) {
                   // Found karaoke file
                   ++fileCount;
-                  workers(config, root, f.substr(0, f.length - '.cdg'.length), (err, song) => {
+                  workers(config, root, collection, f.substr(0, f.length - '.cdg'.length), (err, song) => {
                     if (!err) {
                       console.log('Processed song ' + JSON.stringify(song));
-                      songs.push(song);  
+                      if (!song.isDuplicate) {
+                        songs.push(song);  
+                      }
                     }
-                    --fileCount;
-                    if (fileCount == 0) {
+                    if (--fileCount == 0 && children == 0) {
+                      callback(songs);
+                    }
+                  });
+                } else if (stats.isDirectory()) {
+                  console.log('Found subfolder ' + f);
+                  ++children;
+                  // Directory == new collection. Recursive call.
+                  processFolder(path.join(root, f), collection + '__' + f, config, (songsOfChild) => {
+                    console.log('Processed subfolder ' + collection);
+                    songs = songs.concat(songsOfChild);
+                    if (fileCount == 0 && --children == 0) {
                       callback(songs);
                     }
                   });

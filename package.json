@@ -1,0 +1,22 @@
+{
+  "name": "com.loicortola",
+  "version": "1.0.0",
+  "description": "A simple karaoke file parser to index, compress, and store existing karaoke files",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "karaoke",
+    "parser"
+  ],
+  "author": "Loïc Ortola",
+  "license": "MIT",
+  "dependencies": {
+    "bluebird": "^3.5.0",
+    "mkdirp": "^0.5.1",
+    "node-zip": "^1.1.1",
+    "worker-farm": "^1.5.0",
+    "workerpool": "^2.2.4"
+  }
+}

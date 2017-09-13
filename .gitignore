@@ -1,0 +1,5 @@
+.DS_Store
+.idea
+output
+*.iml
+node_modules

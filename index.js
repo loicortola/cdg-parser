@@ -1,12 +1,12 @@
 const fs = require('fs');
 const path = require('path');
 
-const ioUtils = require('./io-utils');
-const indexUtils = require('./index-utils');
+const ioUtils = require('./lib/io-utils');
+const indexUtils = require('./lib/index-utils');
 
 const workerFarm = require('worker-farm');
-const workers = workerFarm(require.resolve('./process-song'));
-const workersZip = workerFarm(require.resolve('./process-zip'));
+const workers = workerFarm(require.resolve('./lib/process-song'));
+const workersZip = workerFarm(require.resolve('./lib/process-zip'));
 
 /**
  * Write songs in a file when done

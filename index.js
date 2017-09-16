@@ -8,18 +8,44 @@ const workerFarm = require('worker-farm');
 const workers = workerFarm(require.resolve('./lib/process-song'));
 const workersZip = workerFarm(require.resolve('./lib/process-zip'));
 
+const Song = require('./lib/song');
+
+const inputDir = 'input';
+const outputDir = 'output';
+
 /**
  * Write songs in a file when done
  * @param songs
  */
-const finish = (songs) => {
+const finish = (config, songs) => {
   // Kill farms
   workerFarm.end(workers);
   workerFarm.end(workersZip);
   // Create indexes
-  indexUtils.createSongIndexByArtist(songs);
-  indexUtils.createSongIndexByTitle(songs);
-  indexUtils.saveIndex(songs);
+  
+  try {
+    fs.statSync(path.join(config.outputDir, 'index.json'));
+    console.log('Had one previous index. Merging');
+    const previousIndex = indexUtils.loadPreviousIndex(config.outputDir);
+    songs = songs.concat(previousIndex);
+  } catch (err) {}
+  indexUtils.createSongIndexByArtist(config.outputDir, songs);
+  indexUtils.createSongIndexByTitle(config.outputDir, songs);
+  indexUtils.saveIndex(config.outputDir, songs);
+};
+
+const setNextSongId = () => {
+  try {
+    fs.statSync(path.join(outputDir, 'index.json'));
+    console.log('Had one previous index. Setting song id to latest id');
+    let nextSongId = 0;
+    indexUtils.loadPreviousIndex(outputDir).forEach((s) => {
+      if (s.id > nextSongId) {
+        nextSongId = s.id;
+      }
+    });
+    Song.nextId = ++nextSongId;
+  } catch (err) {}
 };
 
 /**
@@ -27,26 +53,31 @@ const finish = (songs) => {
  */
 const readInputs = () => {
   let allSongs = [];
-
-  ioUtils.readdir('./input')
+  let folderCount = 0;
+  setNextSongId();
+  ioUtils.readdir(path.join(inputDir))
       .then((files) => {
         files.forEach((f) => {
-          const karaokeRoot = './input/' + f;
-          const parserFile = karaokeRoot + '/parser.json';
+          const karaokeRoot = path.join(inputDir, f);
+          const parserFile = path.join(karaokeRoot, 'parser.json');
           ioUtils.access(parserFile, fs.constants.F_OK)
               .then(() => {
                 // File parser.js exists, we are in an official karaoke directory.
                 console.log('Parser file found: ' + parserFile);
-                let folderCount = 0;
                 ioUtils.readFile(parserFile, {encoding: 'utf8'})
                     .then((data) => {
+                      console.log('Started processing folder ' + f);
                       folderCount++;
-                      processFolder(karaokeRoot, f, JSON.parse(data), (songs) => {
-                        console.log('Finished processing folder');
+                      const config = JSON.parse(data);
+                      config.inputDir = inputDir;
+                      config.outputDir = outputDir;
+                      processFolder(karaokeRoot, f, config, (songs) => {
+                        console.log('Finished processing folder ' + f);
+                        console.log('There are ' + folderCount + ' left');
                         allSongs = allSongs.concat(songs);
                         --folderCount;
                         if (folderCount == 0) {
-                          finish(allSongs);
+                          finish(config, allSongs);
                         }
                       });
                     })
@@ -80,12 +111,12 @@ const processFolder = (root, collection, config, callback) => {
   ioUtils.readdir(root)
       .then((files) => {
         files.forEach((f) => {
-          ioUtils.stat(root + '/' + f)
+          ioUtils.stat(path.join(root, f))
               .then((stats) => {
                 if (stats.isFile() && f.toLowerCase().endsWith('.cdg')) {
                   // Found karaoke file
                   ++fileCount;
-                  workers(config, root, collection, f.substr(0, f.length - '.cdg'.length), (err, song) => {
+                  workers(config, root, collection, f.substr(0, f.length - '.cdg'.length), Song.nextId++, (err, song) => {
                     if (!err) {
                       console.log('Processed song ' + JSON.stringify(song));
                       if (!song.isDuplicate) {
@@ -99,7 +130,7 @@ const processFolder = (root, collection, config, callback) => {
                 } else if (stats.isFile() && f.toLowerCase().endsWith('.zip')) {
                   // Found zip file. Rename and move
                   ++fileCount;
-                  workersZip(config, root, collection, f.substr(0, f.length - '.zip'.length), (err, song) => {
+                  workersZip(config, root, collection, f.substr(0, f.length - '.zip'.length), Song.nextId++, (err, song) => {
                     if (!err) {
                       console.log('Processed zip ' + JSON.stringify(song));
                       if (!song.isDuplicate) {
@@ -135,8 +166,8 @@ const processFolder = (root, collection, config, callback) => {
 
 
 // Create output directories
-ioUtils.mkdirp(path.join('output', 'duplicates'));
-ioUtils.mkdirp(path.join('output', 'errors'));
-ioUtils.mkdirp(path.join('output', 'processed'));
+ioUtils.mkdirp(path.join(outputDir, 'duplicates'));
+ioUtils.mkdirp(path.join(outputDir, 'errors'));
+ioUtils.mkdirp(path.join(outputDir, 'processed'));
 // Read inputs
 readInputs();

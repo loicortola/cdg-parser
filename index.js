@@ -55,8 +55,10 @@ const readInputs = () => {
   let allSongs = [];
   let folderCount = 0;
   setNextSongId();
+  console.log('Will read input');
   ioUtils.readdir(path.join(inputDir))
       .then((files) => {
+        console.log('Found ' + files.length + ' folders');
         files.forEach((f) => {
           const karaokeRoot = path.join(inputDir, f);
           const parserFile = path.join(karaokeRoot, 'parser.json');
